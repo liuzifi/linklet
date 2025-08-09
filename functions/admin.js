@@ -1,11 +1,11 @@
 export async function onRequest(context) {
-  const { DB } = context.env;
+  const { DB, ADMIN_TOKEN } = context.env; // 从环境变量获取管理密码
   const url = new URL(context.request.url);
   const pathname = url.pathname;
 
   // 简单鉴权
   const token = url.searchParams.get("token");
-  if (token !== "你的管理密码") {
+  if (token !== ADMIN_TOKEN) {
     return new Response("Unauthorized", { status: 401 });
   }
 
