@@ -1,0 +1,87 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Linklet 管理后台</title>
+    <style>
+      body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, "Helvetica Neue", Arial; max-width: 1100px; margin: 24px auto; padding: 0 16px; }
+      header { display:flex; gap:12px; align-items:center; }
+      input, button { padding: 8px 10px; font-size:14px; }
+      table { width:100%; border-collapse: collapse; margin-top:12px; }
+      th, td { border:1px solid #e6e6e6; padding:8px; text-align:left; }
+      th { background:#fafafa }
+      .del { background:#e53935; color:#fff; border:none; padding:6px 10px; cursor:pointer; }
+      .small { font-size:12px; color:#666 }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Linklet 管理后台</h1>
+      <div style="margin-left:auto">
+        <input id="token" type="password" placeholder="管理令牌 (ADMIN_TOKEN)" />
+        <button id="load">加载</button>
+      </div>
+    </header>
+
+    <div class="small">说明：请使用管理令牌以 `Authorization: Bearer TOKEN` 或在 URL 中加 `?token=` 进行鉴权。</div>
+
+    <table>
+      <thead>
+        <tr><th>ID</th><th>短链 (slug)</th><th>目标 URL</th><th>创建时间</th><th>操作</th></tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+
+    <script>
+      const loadBtn = document.getElementById('load');
+      const tokenInput = document.getElementById('token');
+      const tbody = document.getElementById('tbody');
+
+      async function api(path, opts = {}){
+        const token = tokenInput.value.trim();
+        if (!token) return alert('请输入管理令牌');
+        opts.headers = opts.headers || {};
+        opts.headers['Authorization'] = 'Bearer ' + token;
+        const res = await fetch(path, opts);
+        if (res.status === 401) { alert('鉴权失败'); throw new Error('unauthorized'); }
+        if (!res.ok) { const t = await res.text(); alert('请求失败: ' + res.status + '\n' + t); throw new Error('request failed'); }
+        return res.json();
+      }
+
+      async function load(){
+        try{
+          const list = await api('/api/admin/list');
+          tbody.innerHTML = '';
+          list.forEach(row => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td>${row.id}</td>
+              <td>${row.slug}</td>
+              <td><a href="${escapeHtml(row.url)}" target="_blank">${escapeHtml(row.url)}</a></td>
+              <td>${row.create_time || ''}</td>
+              <td><button class="del" data-slug="${row.slug}">删除</button></td>
+            `;
+            tbody.appendChild(tr);
+          });
+        }catch(e){ console.error(e); }
+      }
+
+      function escapeHtml(s){ return (s+'').replace(/[&<>"]+/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+      loadBtn.addEventListener('click', load);
+
+      tbody.addEventListener('click', async (e)=>{
+        if(e.target.matches('.del')){
+          const slug = e.target.getAttribute('data-slug');
+          if(!confirm(`确定删除短链 ${slug} ?`)) return;
+          try{
+            await api(`/api/admin/delete/${encodeURIComponent(slug)}`, { method: 'DELETE' });
+            alert('删除成功');
+            load();
+          }catch(err){ console.error(err); }
+        }
+      });
+    </script>
+  </body>
+</html>
